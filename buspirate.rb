@@ -27,7 +27,7 @@ class BusPirate
     IDLE_POLARITY_0 = 0b00000001    
   end
 
-  UART_FOSC = 32000000
+  FOSC = 32000000
   UART_CLOCK_DIVIDER = 2
 
   attr_reader :port
@@ -134,6 +134,41 @@ class BusPirate
     return check_for_ack(0x01)
   end
 
+  def calculate_pwm_bytes(prescaler, pwm_period, duty_cycle_in_percent)
+    # adapted from this script: http://codepad.org/qtYpZmIF
+    tcy = 2.0/FOSC.to_f
+    pry = pwm_period/(tcy*prescaler)
+    pry -= 1
+    ocr = pry * duty_cycle_in_percent
+
+    bytes = Array.new
+
+    bytes.push case prescaler
+             when 1 then 0
+             when 8 then 1
+             when 64 then 2
+             when 256 then 3
+             end
+    
+    bytes.push((ocr.to_i >> 8) & 0xFF)
+    bytes.push ocr.to_i & 0xFF
+    bytes.push((pry.to_i >> 8) & 0xFF)
+    bytes.push pry.to_i & 0xFF
+
+    return bytes
+  end
+
+  def setup_pwm(prescaler, pwm_period, duty_cycle_in_percent)
+    bytes = calculate_pwm_bytes(prescaler, pwm_period, duty_cycle_in_percent)
+    
+    @port.putc 0b00010010
+    bytes.each do |byte|
+      @port.putc byte
+    end
+    
+    return check_for_ack(0x01)
+  end
+
   # internal!
   def get_adc_voltage
     high_byte = @port.readbyte
@@ -194,7 +229,7 @@ class BusPirate
   end
 
   def uart_set_baudrate(baudrate)
-    register_value = ((((UART_FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
+    register_value = ((((FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
     high_byte = (register_value & 0xFF00) >> 8
     low_byte = register_value & 0x00FF
 
