@@ -20,7 +20,7 @@ begin
   end
 
   print "entering binary UART mode...\t"
-  if buspirate.enter_mode_uart
+  if buspirate.switch_mode(BusPirate::Mode::UART)
     puts "done"
   else
     puts "failed"
@@ -36,7 +36,7 @@ begin
   end
 
   print "setting configuration...\t"
-  if buspirate.uart_set_config(false, 0, false, false)
+  if buspirate.uart_set_config(BusPirate::UART::PIN_OUTPUT_HIZ, BusPirate::UART::FORMAT_8N, BusPirate::UART::STOPBITS_1, BusPirate::UART::IDLE_POLARITY_1)
     puts "done"
   else
     puts "failed"

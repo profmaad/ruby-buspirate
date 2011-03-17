@@ -1,13 +1,31 @@
 require 'rubygems'
 require 'serialport'
 
-DEFAULT_BAUDRATE = 115200
-DEFAULT_DATABITS = 8
-DEFAULT_STOPBITS = 1
-DEFAULT_PARITY = SerialPort::NONE
-DEFAULT_DEVICE = "/dev/bus_pirate"
-
 class BusPirate
+  class Mode
+    RESET = 0
+    SPI = 1
+    I2C = 2
+    UART = 3
+    ONEWIRE = 4
+    RAWWIRE = 5
+  end
+  class UART
+    PIN_OUTPUT_HIZ = 0b00000000
+    PIN_OUTPUT_33V = 0b00010000
+    FORMAT_8N = 0b00000000
+    FORMAT_8E = 0b00000100
+    FORMAT_80 = 0b00001000
+    FORMAT_9N = 0b00001100
+    STOPBITS_1 = 0b00000000
+    STOPBITS_2 = 0b00000010
+    IDLE_POLARITY_1 = 0b00000000
+    IDLE_POLARITY_0 = 0b00000001    
+  end
+
+  UART_FOSC = 32000000
+  UART_CLOCK_DIVIDER = 2
+
   attr_reader :port
   
   def initialize(device, baudrate, databits, stopbits, parity)
@@ -16,7 +34,7 @@ class BusPirate
   end
 
   def close
-    enter_mode_raw
+    reset_bitbang
     exit_bitbang
     @port.close
   end
@@ -47,6 +65,10 @@ class BusPirate
     @port.putc 0x0f
   end
 
+  def reset_bitbang
+    switch_mode(Mode::RESET)
+  end
+
   def check_for_ack(ack)
     if ack.class == String
       ack.each_byte do |ack_byte|
@@ -61,51 +83,56 @@ class BusPirate
     return true
   end
 
-  def enter_mode_raw
-    @port.putc 0x00
-    return check_for_ack("BBIO1")
-  end
-
-  def enter_mode_uart
-    @port.putc 0b00000011
-    return check_for_ack("ART1")
-  end
-  def uart_set_baudrate(baudrate)
-    bitvalue = 0b01100000
-    bitvalue += 
-      case baudrate
-      when 300 then 0b0000
-      when 1200 then 0b0001
-      when 2400 then 0b0010
-      when 4800 then 0b0011
-      when 9600 then 0b0100
-      when 19200 then 0b0101
-      when 31250 then 0b0110
-      when 38400 then 0b0111
-      when 57600 then 0b1000
-      when 115200 then 0b1010
-      end
+  def switch_mode(mode)
+    case mode
+    when Mode::RESET
+      bitvalue = 0b00000000
+      ack = "BBIO1"
+    when Mode::SPI
+      bitvalue = 0b00000001
+      ack = "SPI1"
+    when Mode::I2C
+      bitvalue = 0b00000010
+      ack = "I2C1"
+    when Mode::UART
+      bitvalue = 0b00000011
+      ack = "ART1"
+    when Mode::ONEWIRE
+      bitvalue = 0b00000100
+      ack = "1W01"
+    when Mode::RAWWIRE
+      bitvalue = 0b00000101
+      ack = "RAW1"
+    else
+      return false
+    end
 
     @port.putc bitvalue
-    return check_for_ack(0x01)
+    return check_for_ack(ack)
   end
-  def uart_set_config(pin_output, databits_parity, stopbits, idle_polarity)
+
+  def uart_set_baudrate(baudrate)
+    register_value = ((((UART_FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
+    high_byte = (register_value & 0xFF00) >> 8
+    low_byte = register_value & 0x00FF
+
+    @port.putc 0b00000111
+    return false unless check_for_ack(0x01)
+
+    @port.putc high_byte
+    return false unless check_for_ack(0x01)
+
+    @port.putc low_byte
+    return false unless check_for_ack(0x01)
+
+    return true
+  end
+  def uart_set_config(pin_output, format, stopbits, idle_polarity)
     bitvalue = 0b10000000
-    if pin_output
-      bitvalue += 0b00010000
-    end
-    bitvalue += case databits_parity
-                when 0 then 0b00000000
-                when 1 then 0b00000100
-                when 2 then 0b00001000
-                when 3 then 0b00001100
-                end
-    if stopbits
-      bitvalue += 0b00000010
-    end
-    if idle_polarity
-      bitvalue += 0b00000001
-    end
+    bitvalue += pin_output
+    bitvalue += format
+    bitvalue += stopbits
+    bitvalue += idle_polarity
 
     @port.putc bitvalue
     return check_for_ack(0x01)
@@ -138,69 +165,40 @@ class BusPirate
     
     return check_for_ack(0x01)
   end
-end
 
-begin
-  buspirate = BusPirate.new(DEFAULT_DEVICE, DEFAULT_BAUDRATE, DEFAULT_DATABITS, DEFAULT_STOPBITS, DEFAULT_PARITY)
-
-  buspirate.reset_console
-
-  print "entering bitbang mode..\t\t"
-  if buspirate.enter_bitbang
-    puts "done"
-  else
-    puts "failed"
-    exit
+  def uart_write(data)
+    blocks = data.length.divmod(16)   
+    
+    position = 0
+    (1..blocks[0]).each do
+      @port.putc 0b00011111
+      return position unless check_for_ack(0x01)
+      
+      (0..15).each do
+        @port.putc data[position]
+        return position unless check_for_ack(0x01)
+        position += 1
+      end
+    end
+    
+    if blocks[1] > 0
+      bitvalue = 0b00010000
+      bitvalue += blocks[1]-1
+      @port.putc bitvalue
+      return position unless check_for_ack(0x01)
+      
+      (1..blocks[1]).each do
+        @port.putc data[position]
+        return position unless check_for_ack(0x01)
+        position += 1
+      end
+    end
+    
+    return position
   end
 
-  print "entering binary UART mode...\t"
-  if buspirate.enter_mode_uart
-    puts "done"
-  else
-    puts "failed"
-    exit
+  def uart_activate_bridge_mode
+    # can only be left by un- and replugging the hardware
+    @port.putc 0b00001111
   end
-
-  print "setting baud rate...\t\t"
-  if buspirate.uart_set_baudrate(9600)
-    puts "done"
-  else
-    puts "failed"
-    exit
-  end
-
-  print "setting configuration...\t"
-  if buspirate.uart_set_config(false, 0, false, false)
-    puts "done"
-  else
-    puts "failed"
-    exit
-  end
-  
-  print "configuring peripherals...\t"
-  if buspirate.uart_config_peripherals(true, true, false, false)
-    puts "done"
-  else
-    puts "failed"
-    exit
-  end
-  
-  print "starting RX echo...\t\t"
-  if buspirate.uart_rx_echo(true)
-    puts "done"
-  else
-    puts "failed"
-  end
-
-  while !buspirate.port.eof?
-    puts buspirate.port.readline
-  end
-
-  print "press enter to exit"
-  STDIN.getc
-
-rescue => e
-  puts "Error: #{e}"
-ensure
-  buspirate.close unless buspirate.nil?
 end
