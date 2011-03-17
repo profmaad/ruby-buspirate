@@ -10,6 +10,10 @@ class BusPirate
     ONEWIRE = 4
     RAWWIRE = 5
   end
+  class PinMode
+    OUTPUT = 0
+    INPUT = 1
+  end
   class UART
     PIN_OUTPUT_HIZ = 0b00000000
     PIN_OUTPUT_33V = 0b00010000
@@ -152,6 +156,28 @@ class BusPirate
     loop do
       yield get_adc_voltage
     end
+  end
+
+  def configure_pins(aux, mosi, clk, miso, cs)
+    bitvalue = 0b01000000
+    if aux == PinMode::INPUT
+      bitvalue += 0b00010000
+    end
+    if mosi == PinMode::INPUT
+      bitvalue += 0b00001000
+    end
+    if clk == PinMode::INPUT
+      bitvalue += 0b00000100
+    end
+    if miso == PinMode::INPUT
+      bitvalue += 0b00000010
+    end
+    if cs == PinMode::INPUT
+      bitvalue += 0b00000001
+    end
+
+    @port.putc bitvalue
+    return @port.readbyte   
   end
 
   def uart_set_baudrate(baudrate)
