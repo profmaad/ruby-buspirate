@@ -179,6 +179,19 @@ class BusPirate
     @port.putc bitvalue
     return @port.readbyte   
   end
+  def set_pins(power, pullup, aux, mosi, clk, miso, cs)
+    bitvalue = 0b10000000
+    bitvalue += 0b01000000 if power
+    bitvalue += 0b00100000 if pullup
+    bitvalue += 0b00010000 if aux
+    bitvalue += 0b00001000 if mosi
+    bitvalue += 0b00000100 if clk
+    bitvalue += 0b00000010 if miso
+    bitvalue += 0b00000001 if cs
+
+    @port.putc bitvalue
+    return @port.readbyte
+  end
 
   def uart_set_baudrate(baudrate)
     register_value = ((((UART_FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
