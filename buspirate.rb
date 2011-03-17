@@ -130,8 +130,8 @@ class BusPirate
     return check_for_ack(0x01)
   end
 
-  def read_adc
-    @port.putc 0b00010100
+  # internal!
+  def get_adc_voltage
     high_byte = @port.readbyte
     low_byte = @port.readbyte
 
@@ -139,6 +139,19 @@ class BusPirate
     voltage = (adc_value.to_f/1024.to_f)*6.6
 
     return voltage
+  end
+
+  def read_adc
+    @port.putc 0b00010100
+
+    return get_adc_voltage
+  end
+  def read_adc_continuous
+    @port.putc 0b00010101
+
+    loop do
+      yield get_adc_voltage
+    end
   end
 
   def uart_set_baudrate(baudrate)
