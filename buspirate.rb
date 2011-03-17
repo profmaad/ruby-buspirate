@@ -125,6 +125,22 @@ class BusPirate
     return errors
   end
 
+  def disable_pwm
+    @port.putc 0b00010011
+    return check_for_ack(0x01)
+  end
+
+  def read_adc
+    @port.putc 0b00010100
+    high_byte = @port.readbyte
+    low_byte = @port.readbyte
+
+    adc_value = (high_byte << 8) + low_byte
+    voltage = (adc_value.to_f/1024.to_f)*6.6
+
+    return voltage
+  end
+
   def uart_set_baudrate(baudrate)
     register_value = ((((UART_FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
     high_byte = (register_value & 0xFF00) >> 8
