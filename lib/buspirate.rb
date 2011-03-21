@@ -454,6 +454,21 @@ class BusPirate
     spi_set_cs(cs_idle_high)
   end
 
+  def spi_sniffer(sniff_all)
+    if sniff_all
+      command = 0b00001101
+    else
+      command = 0b00001110
+    end
+
+    @port.putc command
+    return false unless check_for_ack(0x01)
+
+    loop do
+      yield @port.readbyte      
+    end
+  end
+
   def split_int(value)
     high_byte = (value & 0xFF00) >> 8
     low_byte = value & 0x00FF

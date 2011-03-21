@@ -1,8 +1,6 @@
 require 'rubygems'
 require 'buspirate'
 
-require 'pp'
-
 DEFAULT_BAUDRATE = 115200
 DEFAULT_DATABITS = 8
 DEFAULT_STOPBITS = 1
@@ -54,25 +52,29 @@ begin
     exit
   end
 
-  print "setting CS high...\t\t"
-  if buspirate.spi_set_cs(true)
-    puts "done"
-  else
-    puts "failed"
-    exit
-  end
+  print "starting sniffer..."
+  puts ""
 
-  print "writing value to register 0x0009...\t"
-  buspirate.spi_cs_block(true) do
-    pp buspirate.spi_bulk_write_read([0xf0, 0x00, 0x09, 0x23])
-  end
-  print "reading value from register 0x0009...\t"
-  buspirate.spi_cs_block(true) do
-    pp buspirate.spi_bulk_write_read([0x0f, 0x00, 0x09, 0x00])
+  bytes_expected = 0
+  buspirate.spi_sniffer(false) do |byte|
+    if bytes_expected == 2
+      print "0x#{byte.to_s(16)}"
+      bytes_expected = 1
+    elsif bytes_expected == 1
+      puts " :: 0x#{byte.to_s(16)}"
+      bytes_expected = 0
+    elsif byte == 91 # [
+      puts "CS enable"
+    elsif byte == 93 # ]
+      puts "CS disable"
+    elsif byte == 92 # \
+      bytes_expected = 2
+    end
   end
 
 rescue => e
   puts "Error: #{e}"
 ensure
+  buspirate.port.putc 0x01 # this properly ends the sniffer mode when CTRL-C is received
   buspirate.close unless buspirate.nil?
 end
