@@ -8,7 +8,7 @@ Ruby class (and gem in the future) to access [The Bus Pirate](http://dangerouspr
 
  * all "basic" features
  * UART mode
- * SPI mode (except sniffer)
+ * SPI mode
  * all other modes are missing (but will be implemented soon'ish)
 
 ## Dependencies
