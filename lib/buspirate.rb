@@ -26,6 +26,24 @@ class BusPirate
     IDLE_POLARITY_1 = 0b00000000
     IDLE_POLARITY_0 = 0b00000001    
   end
+  class SPI
+    SPEED_30KHZ  = 0b00000000
+    SPEED_125KHZ = 0b00000001
+    SPEED_250KHZ = 0b00000010
+    SPEED_1MHZ   = 0b00000011
+    SPEED_2MHZ   = 0b00000100
+    SPEED_2_6MHZ = 0b00000101
+    SPEED_4MHZ   = 0b00000110
+    SPEED_8MHZ   = 0b00000111
+    PIN_OUTPUT_HIZ = 0b00000000
+    PIN_OUTPUT_33V = 0b00001000
+    CLOCK_IDLE_LOW = 0b00000000
+    CLOCK_IDLE_HIGH = 0b00000100
+    CLOCK_EDGE_IDLE_TO_ACTIVE = 0b00000000
+    CLOCK_EDGE_ACTIVE_TO_IDLE = 0b00000010
+    SAMPLE_TIME_MIDDLE = 0b00000000
+    SAMPLE_TIME_END = 0b00000001
+  end
 
   FOSC = 32000000
   UART_CLOCK_DIVIDER = 2
@@ -228,6 +246,25 @@ class BusPirate
     return @port.readbyte
   end
 
+  def config_peripherals(power, pullups, aux, cs)
+    bitvalue = 0b01000000
+    if power
+      bitvalue += 0b00001000
+    end
+    if pullups
+      bitvalue += 0b00000100
+    end
+    if aux
+      bitvalue += 0b00000010
+    end
+    if cs
+      bitvalue += 0b00000001
+    end
+
+    @port.putc bitvalue
+    return check_for_ack(0x01)
+  end
+
   def uart_set_baudrate(baudrate)
     register_value = ((((FOSC.to_f/UART_CLOCK_DIVIDER.to_f)/baudrate.to_f)/4)-1).round
     high_byte = (register_value & 0xFF00) >> 8
@@ -250,24 +287,6 @@ class BusPirate
     bitvalue += format
     bitvalue += stopbits
     bitvalue += idle_polarity
-
-    @port.putc bitvalue
-    return check_for_ack(0x01)
-  end
-  def uart_config_peripherals(power, pullups, aux, cs)
-    bitvalue = 0b01000000
-    if power
-      bitvalue += 0b00001000
-    end
-    if pullups
-      bitvalue += 0b00000100
-    end
-    if aux
-      bitvalue += 0b00000010
-    end
-    if cs
-      bitvalue += 0b00000001
-    end
 
     @port.putc bitvalue
     return check_for_ack(0x01)
@@ -317,5 +336,128 @@ class BusPirate
   def uart_activate_bridge_mode
     # can only be left by un- and replugging the hardware
     @port.putc 0b00001111
+  end
+
+  def spi_set_cs(cs)
+    if cs
+      @port.putc 0b00000011
+    else
+      @port.putc 0b00000010
+    end
+
+    return check_for_ack(0x01)
+  end
+
+  def spi_set_speed(speed)
+    bitvalue = 0b01100000 + speed
+
+    @port.putc bitvalue
+    return check_for_ack(0x01)
+  end
+
+  def spi_set_config(pin_mode, clock_idle, clock_edge, sample_time)
+    bitvalue = 0b10000000
+    bitvalue += pin_mode
+    bitvalue += clock_idle
+    bitvalue += clock_edge
+    bitvalue += sample_time
+
+    @port.putc bitvalue
+    return check_for_ack(0x01)
+  end
+
+  def spi_bulk_write_read(data)
+    data_read = []
+
+    blocks = data.length.divmod(16)   
+    
+    position = 0
+    (1..blocks[0]).each do
+      @port.putc 0b00011111
+      return data_read unless check_for_ack(0x01)
+      
+      (0..15).each do
+        @port.putc data[position]
+        data_read.push @port.readbyte
+        position += 1
+      end
+    end
+    
+    if blocks[1] > 0
+      bitvalue = 0b00010000
+      bitvalue += blocks[1]-1
+      @port.putc bitvalue
+      return data_read unless check_for_ack(0x01)
+      
+      (1..blocks[1]).each do
+        @port.putc data[position]
+        data_read.push @port.readbyte
+        position += 1
+      end
+    end
+
+    return data_read
+  end
+
+  def spi_write_then_read(data, num_read, without_cs)
+    command = 0b00000100
+    command += 0b00000001 if without_cs
+
+    if data.class == String
+      data_write = data.split(//)
+    else
+      data_write = data
+    end
+    
+    data_read = []
+    while (data_write.length > 0 || data_read.length < num_read)
+      if data_write.length > 4096
+        bytes_to_write = 4096
+      else
+        bytes_to_write = data_write.length
+      end
+      bytes_to_read = num_read - data_read.length
+      bytes_to_read = 4096 if bytes_to_read > 4096
+
+      write_bytes = split_int(bytes_to_write)
+      read_bytes = split_int(bytes_to_read)
+      
+      @port.putc command
+      @port.putc write_bytes[0]
+      @port.putc write_bytes[1]
+      @port.putc read_bytes[0]
+      @port.putc read_bytes[1]
+
+      bytes_to_write.times do
+        @port.putc data_write.shift
+      end
+      
+      select_result = IO.select([@port],[],[],10)
+      if select_result
+        result = check_for_ack(0x01)
+        return data_read unless result
+      end
+
+      bytes_to_read.times do
+        break if @port.eof?
+
+        data_read.push @port.readbyte
+      end
+    end
+
+    return data_read
+  end
+
+  def spi_cs_block(cs_idle_high)
+    spi_set_cs(!cs_idle_high)
+    yield
+    spi_set_cs(cs_idle_high)
+  end
+
+  def split_int(value)
+    high_byte = (value & 0xFF00) >> 8
+    low_byte = value & 0x00FF
+
+    return [high_byte,low_byte]
   end
 end

@@ -1,3 +1,4 @@
+require 'rubygems'
 require 'buspirate'
 
 DEFAULT_BAUDRATE = 115200

@@ -1,3 +1,4 @@
+require 'rubygems'
 require 'buspirate'
 
 DEFAULT_BAUDRATE = 115200
@@ -44,7 +45,7 @@ begin
   end
   
   print "configuring peripherals...\t"
-  if buspirate.uart_config_peripherals(true, true, false, false)
+  if buspirate.config_peripherals(true, true, false, false)
     puts "done"
   else
     puts "failed"
