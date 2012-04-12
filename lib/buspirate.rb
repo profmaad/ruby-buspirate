@@ -73,12 +73,12 @@ class BusPirate
     return false
   end
 
-  def do_switch_mode(mode)
+  def do_switch_mode(bitvalue, ack)
     @port.putc bitvalue
     return check_for_ack(ack)
   end
 
-  def switch_mode(byte, ack)
+  def switch_mode(mode)
     case mode
     when Mode::RESET   then do_switch_mode(0b00000000, "BBIO1")
     when Mode::SPI     then do_switch_mode(0b00000001, "SPI1")
@@ -114,7 +114,7 @@ class BusPirate
 
     bytes = Array.new
 
-    bytes.push {1 => 0, 8 => 1, 64 => 2, 256 => 3}[prescaler]
+    bytes.push({1 => 0, 8 => 1, 64 => 2, 256 => 3}[prescaler])
 
     bytes.push((ocr.to_i >> 8) & 0xFF)
     bytes.push ocr.to_i & 0xFF
