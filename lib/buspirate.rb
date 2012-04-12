@@ -24,7 +24,7 @@ class BusPirate
     STOPBITS_1 = 0b00000000
     STOPBITS_2 = 0b00000010
     IDLE_POLARITY_1 = 0b00000000
-    IDLE_POLARITY_0 = 0b00000001    
+    IDLE_POLARITY_0 = 0b00000001
   end
   class SPI
     SPEED_30KHZ  = 0b00000000
@@ -49,7 +49,7 @@ class BusPirate
   UART_CLOCK_DIVIDER = 2
 
   attr_reader :port
-  
+
   def initialize(device, baudrate, databits, stopbits, parity)
     @port = SerialPort.new(device, :baud => baudrate, :data_bits => databits, :stop_bits => stopbits, :parity => parity)
     throw "failed to initialize Bus Pirate on port #{device}" if @port.nil?
@@ -63,9 +63,9 @@ class BusPirate
 
   def reset_console
     (0..10).each do
-      @port.putc 0x0d # send enter    
+      @port.putc 0x0d # send enter
     end
-    @port.putc '#'    
+    @port.putc '#'
   end
 
   def enter_bitbang
@@ -75,11 +75,11 @@ class BusPirate
       selectResult = IO.select([@port],[],[],0.2)
       if selectResult
         result = check_for_ack("BBIO1")
-        
+
         return true if result
       end
     end
-    
+
     return false
   end
 
@@ -101,7 +101,7 @@ class BusPirate
       read_byte = @port.readbyte
       return false if read_byte != ack
     end
-    
+
     return true
   end
 
@@ -140,7 +140,7 @@ class BusPirate
       @port.putc 0b00010000
     end
     errors = @port.readbyte
-    
+
     @port.putc 0xFF # leave selftest mode
     return -1 unless check_for_ack(0x01)
 
@@ -167,7 +167,7 @@ class BusPirate
              when 64 then 2
              when 256 then 3
              end
-    
+
     bytes.push((ocr.to_i >> 8) & 0xFF)
     bytes.push ocr.to_i & 0xFF
     bytes.push((pry.to_i >> 8) & 0xFF)
@@ -178,12 +178,12 @@ class BusPirate
 
   def setup_pwm(prescaler, pwm_period, duty_cycle_in_percent)
     bytes = calculate_pwm_bytes(prescaler, pwm_period, duty_cycle_in_percent)
-    
+
     @port.putc 0b00010010
     bytes.each do |byte|
       @port.putc byte
     end
-    
+
     return check_for_ack(0x01)
   end
 
@@ -230,7 +230,7 @@ class BusPirate
     end
 
     @port.putc bitvalue
-    return @port.readbyte   
+    return @port.readbyte
   end
   def set_pins(power, pullup, aux, mosi, clk, miso, cs)
     bitvalue = 0b10000000
@@ -298,38 +298,38 @@ class BusPirate
     else
       @port.putc 0b00000011
     end
-    
+
     return check_for_ack(0x01)
   end
 
   def uart_write(data)
-    blocks = data.length.divmod(16)   
-    
+    blocks = data.length.divmod(16)
+
     position = 0
     (1..blocks[0]).each do
       @port.putc 0b00011111
       return position unless check_for_ack(0x01)
-      
+
       (0..15).each do
         @port.putc data[position]
         return position unless check_for_ack(0x01)
         position += 1
       end
     end
-    
+
     if blocks[1] > 0
       bitvalue = 0b00010000
       bitvalue += blocks[1]-1
       @port.putc bitvalue
       return position unless check_for_ack(0x01)
-      
+
       (1..blocks[1]).each do
         @port.putc data[position]
         return position unless check_for_ack(0x01)
         position += 1
       end
     end
-    
+
     return position
   end
 
@@ -369,26 +369,26 @@ class BusPirate
   def spi_bulk_write_read(data)
     data_read = []
 
-    blocks = data.length.divmod(16)   
-    
+    blocks = data.length.divmod(16)
+
     position = 0
     (1..blocks[0]).each do
       @port.putc 0b00011111
       return data_read unless check_for_ack(0x01)
-      
+
       (0..15).each do
         @port.putc data[position]
         data_read.push @port.readbyte
         position += 1
       end
     end
-    
+
     if blocks[1] > 0
       bitvalue = 0b00010000
       bitvalue += blocks[1]-1
       @port.putc bitvalue
       return data_read unless check_for_ack(0x01)
-      
+
       (1..blocks[1]).each do
         @port.putc data[position]
         data_read.push @port.readbyte
@@ -408,7 +408,7 @@ class BusPirate
     else
       data_write = data
     end
-    
+
     data_read = []
     while (data_write.length > 0 || data_read.length < num_read)
       if data_write.length > 4096
@@ -421,7 +421,7 @@ class BusPirate
 
       write_bytes = split_int(bytes_to_write)
       read_bytes = split_int(bytes_to_read)
-      
+
       @port.putc command
       @port.putc write_bytes[0]
       @port.putc write_bytes[1]
@@ -431,7 +431,7 @@ class BusPirate
       bytes_to_write.times do
         @port.putc data_write.shift
       end
-      
+
       select_result = IO.select([@port],[],[],10)
       if select_result
         result = check_for_ack(0x01)
@@ -465,7 +465,7 @@ class BusPirate
     return false unless check_for_ack(0x01)
 
     loop do
-      yield @port.readbyte      
+      yield @port.readbyte
     end
   end
 
