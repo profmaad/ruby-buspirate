@@ -1,8 +1,9 @@
-# ruby-buspirate - Ruby interface to Bus Pirate (via binary mode)
+# BusPirate - Ruby interface to Bus Pirate (via binary mode)
 
 ## Description
 
-Ruby class (and gem in the future) to access [The Bus Pirate](http://dangerousprototypes.com/docs/Bus_Pirate) in binary mode
+Ruby class (and gem in the future) to access [The Bus Pirate](http://dangerousprototypes.com/docs/Bus_Pirate) in binary mode.
+
 
 ## Features
 
@@ -22,9 +23,11 @@ Create a BusPirate instance:
 
     pirate = BusPirate.new('/dev/port', bauds, bits, stopbit, parity)
 
+
 Linux example (115200b 8-N-1):
 
     pirate = BusPirate.new('/dev/ttyACM0')
+
 
 Select Mode:
 
@@ -39,10 +42,17 @@ Select Mode:
 
 Have fun!
 
+
+## Examples
+
+Check out the examples/ folder for some action.
+
+
 ## Dependencies
 
  * serialport
  * a Bus Pirate ^^
+
 
 ## License
 
