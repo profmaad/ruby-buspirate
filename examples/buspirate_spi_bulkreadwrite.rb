@@ -1,4 +1,4 @@
-require 'rubygems'
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 require 'buspirate'
 
 require 'pp'
@@ -45,7 +45,7 @@ begin
     puts "failed"
     exit
   end
-  
+
   print "configuring peripherals...\t"
   if buspirate.config_peripherals(true, false, true, false)
     puts "done"

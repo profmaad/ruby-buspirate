@@ -1,16 +1,19 @@
-require 'rubygems'
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
+require 'i18n'
 require 'buspirate'
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_DATABITS = 8
 DEFAULT_STOPBITS = 1
 DEFAULT_PARITY = SerialPort::NONE
-DEFAULT_DEVICE = "/dev/bus_pirate"
+DEFAULT_DEVICE = Dir.glob('/dev/ttyACM*').first
+
 
 begin
   buspirate = BusPirate.new(DEFAULT_DEVICE, DEFAULT_BAUDRATE, DEFAULT_DATABITS, DEFAULT_STOPBITS, DEFAULT_PARITY)
 
   buspirate.reset_console
+  puts "Start on #{DEFAULT_DEVICE}"
 
   print "entering bitbang mode..\t\t"
   if buspirate.enter_bitbang
@@ -43,7 +46,7 @@ begin
     puts "failed"
     exit
   end
-  
+
   print "configuring peripherals...\t"
   if buspirate.config_peripherals(true, true, false, false)
     puts "done"
@@ -51,7 +54,7 @@ begin
     puts "failed"
     exit
   end
-  
+
   print "starting RX echo...\t\t"
   if buspirate.uart_rx_echo(true)
     puts "done"

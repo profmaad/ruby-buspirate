@@ -1,11 +1,11 @@
-require 'rubygems'
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 require 'buspirate'
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_DATABITS = 8
 DEFAULT_STOPBITS = 1
 DEFAULT_PARITY = SerialPort::NONE
-DEFAULT_DEVICE = "/dev/bus_pirate"
+DEFAULT_DEVICE = Dir.glob('/dev/ttyACM*').first
 
 begin
   buspirate = BusPirate.new(DEFAULT_DEVICE, DEFAULT_BAUDRATE, DEFAULT_DATABITS, DEFAULT_STOPBITS, DEFAULT_PARITY)
