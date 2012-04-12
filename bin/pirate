@@ -87,20 +87,20 @@ ensure
 end
 
 
-def volts
-end
-
-
-
 if ARGV.empty?
 
-   puts
-   puts "BusPirate!"
-   puts
-   puts "What should we do captain?"
-   puts
-   puts "  uart - sniffs UART"
-   puts "  volt - monitor VOLTAGE probe"
+  puts <<TEXT
+
+ BusPirate!
+------------
+
+What should we do captain?"
+
+  uart - sniffs UART"
+  volt - monitor VOLTAGE probe"
+
+TEXT
+
 else
   case comm = ARGV.join
   when /uart/ then uart_sniffer
