@@ -11,10 +11,37 @@ Ruby class (and gem in the future) to access [The Bus Pirate](http://dangerouspr
  * SPI mode
  * all other modes are missing (but will be implemented soon'ish)
 
+Tested on Linux and OSX (should on windoze if seriaport does).
+
+
+## Use
+
+Create a BusPirate instance:
+
+    require 'buspirate'
+
+    pirate = BusPirate.new('/dev/port', bauds, bits, stopbit, parity)
+
+Linux example (115200b 8-N-1):
+
+    pirate = BusPirate.new('/dev/ttyACM0')
+
+Select Mode:
+
+    Mode::SPI
+    Mode::I2C
+    Mode::UART
+    Mode::ONEWIRE
+    Mode::RAWWIRE
+
+    pirate.switch_mode(BusPirate::Mode::XXX)
+
+
+Have fun!
+
 ## Dependencies
 
- * rubygems
- * ruby-serialport
+ * serialport
  * a Bus Pirate ^^
 
 ## License
