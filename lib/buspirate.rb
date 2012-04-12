@@ -10,7 +10,7 @@ class BusPirate
 
   attr_reader :port
 
-  def initialize(device, baudrate, databits, stopbits, parity)
+  def initialize(device, baudrate = 115200, databits = 8, stopbits = 1, parity = SerialPort::NONE)
     @port = SerialPort.new(device, :baud => baudrate, :data_bits => databits, :stop_bits => stopbits, :parity => parity)
     throw "failed to initialize Bus Pirate on port #{device}" if @port.nil?
   end
@@ -27,8 +27,6 @@ class BusPirate
     end
     @port.putc '#'
   end
-
-
 
   def exit_bitbang
     @port.putc 0x0f
