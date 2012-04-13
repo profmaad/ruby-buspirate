@@ -1,0 +1,109 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
+require 'buspirate'
+
+
+DEFAULT_DEVICE = Dir.glob('/dev/ttyACM*').first
+
+
+def buspirate
+  @pirate ||= BusPirate.new(DEFAULT_DEVICE)
+end
+
+def warm_up
+  buspirate.reset_console
+  puts "Start on #{DEFAULT_DEVICE}"
+
+  print "entering bitbang mode..\t\t"
+  if buspirate.enter_bitbang
+    puts "done"
+  else
+    puts "failed"
+    exit
+  end
+end
+
+def volt_sniffer
+  warm_up
+  buspirate.read_adc_continuous
+end
+
+def uart_sniffer
+  warm_up
+
+  print "entering binary UART mode...\t"
+  if buspirate.switch_mode(BusPirate::Mode::UART)
+    puts "done"
+  else
+    puts "failed"
+    exit
+  end
+
+  print "setting baud rate...\t\t"
+  if buspirate.uart_set_baudrate(19600)
+    puts "done"
+  else
+    puts "failed"
+    exit
+  end
+
+  print "setting configuration...\t"
+  if buspirate.uart_set_config(BusPirate::UART::PIN_OUTPUT_HIZ, BusPirate::UART::FORMAT_8N, BusPirate::UART::STOPBITS_1, BusPirate::UART::IDLE_POLARITY_1)
+    puts "done"
+  else
+    puts "failed"
+    exit
+  end
+
+  print "configuring peripherals...\t"
+  if buspirate.config_peripherals(true, true, false, false)
+    puts "done"
+  else
+    puts "failed"
+    exit
+  end
+
+  print "starting RX echo...\t\t"
+  if buspirate.uart_rx_echo(true)
+    puts "done"
+  else
+    puts "failed"
+  end
+
+  while !buspirate.port.eof?
+    puts buspirate.port.readline
+  end
+
+  print "press enter to exit"
+  STDIN.getc
+
+rescue => e
+  puts "Error: #{e}"
+ensure
+  buspirate.close unless buspirate.nil?
+end
+
+
+if ARGV.empty?
+
+  puts <<TEXT
+
+ BusPirate!
+------------
+
+What should we do captain?"
+
+  uart - sniffs UART"
+  volt - monitor VOLTAGE probe"
+
+TEXT
+
+else
+  case comm = ARGV.join
+  when /uart/ then uart_sniffer
+  when /volt/ then volt_sniffer
+  else
+    puts "Dunno how to #{comm}"
+  end
+end
+

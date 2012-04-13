@@ -10,7 +10,7 @@ class BusPirate
 
   attr_reader :port
 
-  def initialize(device, baudrate, databits, stopbits, parity)
+  def initialize(device, baudrate = 115200, databits = 8, stopbits = 1, parity = SerialPort::NONE)
     @port = SerialPort.new(device, :baud => baudrate, :data_bits => databits, :stop_bits => stopbits, :parity => parity)
     throw "failed to initialize Bus Pirate on port #{device}" if @port.nil?
   end
@@ -22,13 +22,9 @@ class BusPirate
   end
 
   def reset_console
-    (0..10).each do
-      @port.putc 0x0d # send enter
-    end
+    (0..10).each { @port.putc 0x0d } # send enter
     @port.putc '#'
   end
-
-
 
   def exit_bitbang
     @port.putc 0x0f
@@ -77,45 +73,30 @@ class BusPirate
     return false
   end
 
-  def switch_mode(mode)
-    case mode
-    when Mode::RESET
-      bitvalue = 0b00000000
-      ack = "BBIO1"
-    when Mode::SPI
-      bitvalue = 0b00000001
-      ack = "SPI1"
-    when Mode::I2C
-      bitvalue = 0b00000010
-      ack = "I2C1"
-    when Mode::UART
-      bitvalue = 0b00000011
-      ack = "ART1"
-    when Mode::ONEWIRE
-      bitvalue = 0b00000100
-      ack = "1W01"
-    when Mode::RAWWIRE
-      bitvalue = 0b00000101
-      ack = "RAW1"
-    else
-      return false
-    end
-
+  def do_switch_mode(bitvalue, ack)
     @port.putc bitvalue
     return check_for_ack(ack)
   end
 
-  def run_selftest(long)
-    if long
-      @port.putc 0b00010001
+  def switch_mode(mode)
+    case mode
+    when Mode::RESET   then do_switch_mode(0b00000000, "BBIO1")
+    when Mode::SPI     then do_switch_mode(0b00000001, "SPI1")
+    when Mode::I2C     then do_switch_mode(0b00000010, "I2C1")
+    when Mode::UART    then do_switch_mode(0b00000011, "ART1")
+    when Mode::ONEWIRE then do_switch_mode(0b00000100, "1W01")
+    when Mode::RAWWIRE then do_switch_mode(0b00000101, "RAW1")
     else
-      @port.putc 0b00010000
+      return false
     end
+  end
+
+  def run_selftest(long)
+    @port.putc(long ? 0b00010001 : 0b00010000)
     errors = @port.readbyte
 
     @port.putc 0xFF # leave selftest mode
     return -1 unless check_for_ack(0x01)
-
     return errors
   end
 
@@ -133,12 +114,7 @@ class BusPirate
 
     bytes = Array.new
 
-    bytes.push case prescaler
-             when 1 then 0
-             when 8 then 1
-             when 64 then 2
-             when 256 then 3
-             end
+    bytes.push({1 => 0, 8 => 1, 64 => 2, 256 => 3}[prescaler])
 
     bytes.push((ocr.to_i >> 8) & 0xFF)
     bytes.push ocr.to_i & 0xFF
@@ -175,35 +151,27 @@ class BusPirate
 
     return get_adc_voltage
   end
+
   def read_adc_continuous
     @port.putc 0b00010101
 
     loop do
-      yield get_adc_voltage
+      p get_adc_voltage
     end
   end
 
   def configure_pins(aux, mosi, clk, miso, cs)
     bitvalue = 0b01000000
-    if aux == PinMode::INPUT
-      bitvalue += 0b00010000
-    end
-    if mosi == PinMode::INPUT
-      bitvalue += 0b00001000
-    end
-    if clk == PinMode::INPUT
-      bitvalue += 0b00000100
-    end
-    if miso == PinMode::INPUT
-      bitvalue += 0b00000010
-    end
-    if cs == PinMode::INPUT
-      bitvalue += 0b00000001
-    end
+    bitvalue += 0b00010000 if aux == PinMode::INPUT
+    bitvalue += 0b00001000 if mosi == PinMode::INPUT
+    bitvalue += 0b00000100 if clk == PinMode::INPUT
+    bitvalue += 0b00000010 if miso == PinMode::INPUT
+    bitvalue += 0b00000001 if cs == PinMode::INPUT
 
     @port.putc bitvalue
     return @port.readbyte
   end
+
   def set_pins(power, pullup, aux, mosi, clk, miso, cs)
     bitvalue = 0b10000000
     bitvalue += 0b01000000 if power
@@ -220,18 +188,10 @@ class BusPirate
 
   def config_peripherals(power, pullups, aux, cs)
     bitvalue = 0b01000000
-    if power
-      bitvalue += 0b00001000
-    end
-    if pullups
-      bitvalue += 0b00000100
-    end
-    if aux
-      bitvalue += 0b00000010
-    end
-    if cs
-      bitvalue += 0b00000001
-    end
+    bitvalue += 0b00001000 if power
+    bitvalue += 0b00000100 if pullups
+    bitvalue += 0b00000010 if aux
+    bitvalue += 0b00000001 if cs
 
     @port.putc bitvalue
     return check_for_ack(0x01)
@@ -253,6 +213,7 @@ class BusPirate
 
     return true
   end
+
   def uart_set_config(pin_output, format, stopbits, idle_polarity)
     bitvalue = 0b10000000
     bitvalue += pin_output
@@ -265,11 +226,7 @@ class BusPirate
   end
 
   def uart_rx_echo(echo)
-    if echo
-      @port.putc 0b00000010
-    else
-      @port.putc 0b00000011
-    end
+    @port.putc(echo ? 0b00000010 : 0b00000011)
 
     return check_for_ack(0x01)
   end
@@ -311,11 +268,7 @@ class BusPirate
   end
 
   def spi_set_cs(cs)
-    if cs
-      @port.putc 0b00000011
-    else
-      @port.putc 0b00000010
-    end
+    @port.putc(cs ? 0b00000011 : 0b00000010)
 
     return check_for_ack(0x01)
   end
@@ -427,18 +380,12 @@ class BusPirate
   end
 
   def spi_sniffer(sniff_all)
-    if sniff_all
-      command = 0b00001101
-    else
-      command = 0b00001110
-    end
+    command = (sniff_all ? 0b00001101 : 0b00001110)
 
     @port.putc command
     return false unless check_for_ack(0x01)
 
-    loop do
-      yield @port.readbyte
-    end
+    loop { yield @port.readbyte }
   end
 
   def split_int(value)
